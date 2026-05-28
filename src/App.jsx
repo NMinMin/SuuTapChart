@@ -1,49 +1,91 @@
-import { useState, useEffect, useMemo } from 'react';
-import { initialData } from './data';
-import { Sun, Moon, RotateCcw, ChevronDown, Cat } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { projects } from './data/projects';
+import { glossary } from './data/glossary';
 import './index.css';
 
 function App() {
-  const [data, setData] = useState(initialData);
-  const [isDark, setIsDark] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState({});
+  const [currentView, setCurrentView] = useState(() => {
+    const saved = localStorage.getItem('crochet_currentView');
+    return saved || 'projects';
+  });
+  const [activeProjectId, setActiveProjectId] = useState(() => {
+    const saved = localStorage.getItem('crochet_activeProjectId');
+    return saved || null;
+  });
 
   useEffect(() => {
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setIsDark(true);
-      document.body.classList.add('dark');
+    localStorage.setItem('crochet_currentView', currentView);
+  }, [currentView]);
+
+  useEffect(() => {
+    if (activeProjectId) {
+      localStorage.setItem('crochet_activeProjectId', activeProjectId);
+    } else {
+      localStorage.removeItem('crochet_activeProjectId');
     }
-  }, []);
+  }, [activeProjectId]);
+  
+  // Theme state
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('theme');
+    if (saved) return saved;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
   const toggleTheme = () => {
-    setIsDark(!isDark);
-    if (!isDark) {
-      document.body.classList.add('dark');
-    } else {
-      document.body.classList.remove('dark');
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
+  
+  // State for storing progress of ALL projects. Key: projectId, Value: array of completed item IDs
+  const [progress, setProgress] = useState(() => {
+    const saved = localStorage.getItem('crochet_progress');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crochet_progress', JSON.stringify(progress));
+  }, [progress]);
+
+  // Handle active project
+  const activeProject = useMemo(() => {
+    return projects.find(p => p.id === activeProjectId) || null;
+  }, [activeProjectId]);
+
+  const toggleRow = (projectId, rowId) => {
+    setProgress(prev => {
+      const projectProgress = prev[projectId] || [];
+      if (projectProgress.includes(rowId)) {
+        return { ...prev, [projectId]: projectProgress.filter(id => id !== rowId) };
+      } else {
+        return { ...prev, [projectId]: [...projectProgress, rowId] };
+      }
+    });
+  };
+
+  const resetAll = (projectId) => {
+    if(window.confirm('Bạn có chắc chắn muốn reset toàn bộ tiến trình đánh dấu của mẫu này?')) {
+      setProgress(prev => ({ ...prev, [projectId]: [] }));
     }
   };
 
-  const toggleRow = (id) => {
-    setData(data.map(item => 
-      item.id === id ? { ...item, completed: !item.completed } : item
-    ));
-  };
-
-  const resetAll = () => {
-    if(window.confirm('Bạn có chắc chắn muốn reset toàn bộ tiến trình đánh dấu?')) {
-      setData(data.map(item => ({ ...item, completed: false })));
-    }
-  };
-
-  // Group data by part
+  // Group data by part for Pattern Detail
   const groupedData = useMemo(() => {
+    if (!activeProject) return [];
     const groups = [];
     let currentGroup = null;
     let groupIndex = 0;
 
-    data.forEach((item) => {
-      // If item has a part name, create a new group
+    activeProject.data.forEach((item) => {
       if (item.part && item.part.trim() !== '') {
         currentGroup = {
           id: `group-${groupIndex++}`,
@@ -52,108 +94,265 @@ function App() {
         };
         groups.push(currentGroup);
       } else if (currentGroup) {
-        // If no part name, add to current group
         currentGroup.items.push(item);
       }
     });
-
     return groups;
-  }, [data]);
+  }, [activeProject]);
 
-  const toggleGroup = (groupId) => {
-    setExpandedGroups(prev => ({
-      ...prev,
-      [groupId]: prev[groupId] === false ? true : false
-    }));
+  const getGroupIcon = (title) => {
+    const t = title.toLowerCase();
+    if (t.includes('đĩa')) return 'restaurant';
+    if (t.includes('lót')) return 'layers';
+    if (t.includes('chân')) return 'support';
+    if (t.includes('tai')) return 'pets';
+    if (t.includes('thân')) return 'body_system';
+    if (t.includes('mắt')) return 'visibility';
+    if (t.includes('viền')) return 'border_outer';
+    if (t.includes('khăn')) return 'checkroom';
+    return 'category';
   };
 
-  const completedCount = data.filter(item => item.completed).length;
-  const totalCount = data.length;
-  const progressPercent = Math.round((completedCount / totalCount) * 100) || 0;
-
-  return (
-    <>
-      <header className="app-header">
-        <div className="header-content">
-          <div className="header-top">
-            <div>
-              <div className="header-subtitle font-mono">Nhật ký móc len</div>
-              <h1 className="header-title font-serif">
-                <Cat size={36} color="var(--text-accent)" strokeWidth={2.5} /> Đĩa Tai Mèo
-              </h1>
-            </div>
-            <div className="header-actions">
-              <button className="btn-header" onClick={resetAll} title="Reset">
-                <RotateCcw size={16} /> <span className="font-mono">Reset</span>
-              </button>
-              <button className="btn-header" onClick={toggleTheme} title="Giao diện Sáng/Tối">
-                {isDark ? <Sun size={16} /> : <Moon size={16} />}
-              </button>
-            </div>
-          </div>
-          
-          <div className="progress-section">
-            <div className="progress-label font-mono">
-              <span>Tiến trình</span>
-              <span style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-header)' }}>{progressPercent}%</span>
-            </div>
-            <div className="progress-track">
-              <div className="progress-fill" style={{ width: `${progressPercent}%` }}></div>
-            </div>
-            <div className="progress-stats font-mono">
-              {completedCount} / {totalCount} hàng
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="main-content">
-        {groupedData.map((group) => {
-          const groupCompleted = group.items.filter(i => i.completed).length;
-          const groupTotal = group.items.length;
-          const isExpanded = expandedGroups[group.id] !== false; // default true
+  const renderProjectsView = () => (
+    <div className="max-w-7xl mx-auto px-container-margin-mobile md:px-container-margin-desktop mt-8 mb-24">
+      <div className="mb-12">
+        <h1 className="font-headline-lg text-headline-lg text-on-surface mb-2">Dự án của tôi</h1>
+        <p className="font-body-md text-body-md text-on-surface-variant max-w-xl">
+          Chọn một mẫu móc len để bắt đầu theo dõi tiến độ của bạn.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+        {projects.map(project => {
+          const completedCount = (progress[project.id] || []).length;
+          const totalCount = project.data.length;
+          const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
           return (
-            <div className="card" key={group.id}>
-              <div className="card-header" onClick={() => toggleGroup(group.id)}>
-                <div className="card-title-group">
-                  <div className="card-progress-circle font-mono">
-                    {groupCompleted}/{groupTotal}
-                  </div>
-                  <h2 className="card-title font-serif">{group.title}</h2>
+            <div 
+              key={project.id} 
+              className="pattern-card rounded-xl border border-outline-variant/30 flex flex-col overflow-hidden cursor-pointer"
+              onClick={() => { setActiveProjectId(project.id); setCurrentView('pattern'); }}
+            >
+              <div className="h-48 w-full bg-surface-variant overflow-hidden">
+                <img src={project.image} alt={project.title} className="w-full h-full object-cover transition-transform duration-500 hover:scale-105" />
+              </div>
+              <div className="p-6 flex flex-col flex-grow">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
+                    {project.icon}
+                  </span>
+                  <h3 className="font-headline-sm text-headline-sm text-on-surface">{project.title}</h3>
                 </div>
-                <div className={`card-icon ${isExpanded ? 'open' : ''}`}>
-                  <ChevronDown size={24} />
+                <p className="font-body-md text-body-md text-on-surface-variant mb-6 line-clamp-2">
+                  {project.description}
+                </p>
+                <div className="mt-auto">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-label-md text-label-md text-primary">Tiến độ</span>
+                    <span className="font-label-md text-label-md text-primary font-semibold">{percent}%</span>
+                  </div>
+                  <div className="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden">
+                    <div className="h-full bg-primary" style={{ width: `${percent}%` }}></div>
+                  </div>
                 </div>
               </div>
-              
-              {isExpanded && (
-                <div className="row-list">
-                  {group.items.map((item, index) => {
-                    const rowNum = (index + 1).toString().padStart(2, '0');
-                    return (
-                      <div 
-                        key={item.id} 
-                        className={`row-item ${item.completed ? 'completed' : ''}`}
-                        onClick={() => toggleRow(item.id)}
-                      >
-                        <div className="row-index font-mono">{rowNum}</div>
-                        <div className="row-name font-mono">{item.row}</div>
-                        <div className="row-formula font-mono">{item.formula}</div>
-                        <div className="circle-checkbox">
-                          <svg width="14" height="10" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M1 5L5 9L13 1" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+
+  const renderPatternView = () => {
+    if (!activeProject) return null;
+    const completedCount = (progress[activeProject.id] || []).length;
+    const totalCount = activeProject.data.length;
+    const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+    return (
+      <div className="max-w-7xl mx-auto px-container-margin-mobile md:px-container-margin-desktop mt-8 mb-24">
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+            <div>
+              <div className="flex items-center gap-2 mb-2 cursor-pointer hover:text-primary transition-colors text-on-surface-variant" onClick={() => setCurrentView('projects')}>
+                <span className="material-symbols-outlined text-sm">arrow_back</span>
+                <span className="font-label-md text-label-md">Quay lại</span>
+              </div>
+              <h1 className="font-headline-lg text-headline-lg text-on-surface mb-2">{activeProject.title}</h1>
+              <p className="font-body-md text-body-md text-on-surface-variant max-w-xl">
+                {activeProject.description}
+              </p>
+            </div>
+            
+            <div className="bg-surface-container-low p-6 rounded-xl flex-shrink-0 w-full md:w-80 relative">
+              <button 
+                onClick={() => resetAll(activeProject.id)} 
+                className="absolute top-4 right-4 p-2 rounded-full hover:bg-surface-variant/50 text-on-surface-variant transition-colors"
+                title="Reset toàn bộ tiến độ"
+              >
+                <span className="material-symbols-outlined">restart_alt</span>
+              </button>
+              <div className="flex justify-between items-center mb-4 pr-10">
+                <span className="font-label-md text-label-md text-primary">TIẾN ĐỘ TỔNG THỂ</span>
+                <span className="font-headline-sm text-headline-sm text-primary">{progressPercent}%</span>
+              </div>
+              <div className="w-full bg-surface-container-highest h-2 rounded-full overflow-hidden mb-2">
+                <div className="h-full bg-primary-container" style={{ width: `${progressPercent}%`, transition: 'width 0.5s ease-in-out' }}></div>
+              </div>
+              <p className="font-label-sm text-label-sm text-on-surface-variant">
+                {completedCount} trên {totalCount} hàng đã hoàn thành
+              </p>
+            </div>
+          </div>
+          
+          {/* Note Ký hiệu tương đương */}
+          {(() => {
+            const usedSymbols = glossary.filter(term => {
+              const symbols = term.symbol.split('/');
+              return activeProject.data.some(row => 
+                symbols.some(sym => row.formula && row.formula.includes(sym))
+              );
+            });
+            
+            if (usedSymbols.length === 0) return null;
+            
+            return (
+              <div className="bg-surface-variant/30 p-4 rounded-xl border border-outline-variant/30">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="material-symbols-outlined text-primary text-[20px]">info</span>
+                  <h3 className="font-label-md text-label-md text-on-surface">Ghi chú ký hiệu (Tương đương)</h3>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {usedSymbols.map(term => (
+                    <span key={term.symbol} className="px-3 py-1.5 bg-surface-container-lowest rounded-md font-label-sm text-label-sm text-on-surface border border-outline-variant/50 shadow-sm">
+                      <strong className="text-primary">{term.symbol}</strong>: {term.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter mb-16">
+          {groupedData.map(group => (
+            <div key={group.id} className="pattern-card p-6 rounded-xl border border-outline-variant/30 flex flex-col h-[500px]">
+              <div className="flex items-center gap-3 mb-6">
+                <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  {getGroupIcon(group.title)}
+                </span>
+                <h3 className="font-headline-sm text-headline-sm text-on-surface">{group.title}</h3>
+              </div>
+              <div className="flex-grow overflow-y-auto custom-scrollbar space-y-3 pr-2">
+                {group.items.map((item) => {
+                  const isCompleted = (progress[activeProject.id] || []).includes(item.id);
+                  return (
+                    <div key={item.id} onClick={() => toggleRow(activeProject.id, item.id)} className="flex items-start gap-4 group cursor-pointer py-1">
+                      <span 
+                        className={`material-symbols-outlined mt-0.5 flex-shrink-0 ${isCompleted ? 'text-primary' : 'text-outline-variant'} text-[20px] transition-colors`}
+                        style={isCompleted ? { fontVariationSettings: "'FILL' 1" } : {}}
+                      >
+                        {isCompleted ? 'check_circle' : 'radio_button_unchecked'}
+                      </span>
+                      <div className="flex flex-col">
+                        <span className={`font-body-md text-body-md transition-colors ${isCompleted ? 'text-outline-variant line-through' : 'text-on-surface-variant group-hover:text-primary'}`}>
+                          <span className="font-semibold">{item.row && `${item.row}: `}</span>{item.formula}
+                        </span>
+                        {item.note && (
+                          <span className={`font-label-sm text-label-sm mt-1 transition-colors ${isCompleted ? 'text-outline-variant/50' : 'text-on-surface-variant/70'}`}>
+                            {item.note}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderLibraryView = () => (
+    <div className="max-w-7xl mx-auto px-container-margin-mobile md:px-container-margin-desktop mt-8 mb-24">
+      <div className="mb-12">
+        <h1 className="font-headline-lg text-headline-lg text-on-surface mb-2">Thư viện Ký hiệu</h1>
+        <p className="font-body-md text-body-md text-on-surface-variant max-w-xl">
+          Bảng tra cứu các ký hiệu móc len cơ bản và hướng dẫn cách thực hiện.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+        {glossary.map((term, idx) => (
+          <div key={idx} className="pattern-card p-6 rounded-xl border border-outline-variant/30 flex flex-col">
+            <div className="flex items-center gap-4 mb-4 pb-4 border-b border-surface-variant">
+              <div className="w-12 h-12 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-headline-md font-bold">
+                {term.symbol}
+              </div>
+              <div>
+                <h3 className="font-headline-sm text-headline-sm text-on-surface">{term.name}</h3>
+                <p className="font-label-sm text-label-sm text-primary">Ký hiệu: {term.symbol}</p>
+              </div>
+            </div>
+            <ul className="space-y-3 pl-2">
+              {term.instructions.map((inst, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <span className="material-symbols-outlined text-outline-variant text-[16px] mt-1">fiber_manual_record</span>
+                  <span className="font-body-md text-body-md text-on-surface-variant">{inst}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Top Navigation Bar */}
+      <nav className="sticky top-0 z-50 bg-surface/80 backdrop-blur-md flex justify-between items-center w-full px-container-margin-mobile md:px-container-margin-desktop py-4 border-b border-surface-variant/50">
+        <div className="flex flex-col">
+          <span className="font-headline-md text-headline-md font-semibold text-primary">Nhật ký Móc Len</span>
+          <span className="font-label-md text-label-md text-on-surface-variant">
+            {currentView === 'projects' ? 'Trang Chủ' : currentView === 'pattern' ? 'Chi tiết mẫu móc' : 'Thư viện Ký hiệu'}
+          </span>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-surface-variant/50 transition-colors active:scale-95 duration-150 text-primary">
+            <span className="material-symbols-outlined">
+              {theme === 'dark' ? 'light_mode' : 'dark_mode'}
+            </span>
+          </button>
+        </div>
+      </nav>
+
+      <main>
+        {currentView === 'projects' && renderProjectsView()}
+        {currentView === 'pattern' && renderPatternView()}
+        {currentView === 'library' && renderLibraryView()}
       </main>
+
+      {/* Bottom Navigation Bar */}
+      <div className="fixed bottom-0 left-0 w-full z-50 bg-surface-container-lowest shadow-[0_-4px_12px_rgba(153,188,133,0.1)] rounded-t-xl px-4 pt-2 pb-safe">
+        <div className="flex justify-around items-center w-full">
+          <button 
+            onClick={() => setCurrentView('projects')}
+            className={`flex flex-col items-center justify-center rounded-full px-5 py-1.5 transition-all active:scale-90 duration-200 ${currentView === 'projects' || currentView === 'pattern' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:text-primary'}`}
+          >
+            <span className="material-symbols-outlined" style={currentView === 'projects' || currentView === 'pattern' ? { fontVariationSettings: "'FILL' 1" } : {}}>folder_open</span>
+            <span className="font-label-sm text-label-sm mt-0.5">Dự án</span>
+          </button>
+          <button 
+            onClick={() => setCurrentView('library')}
+            className={`flex flex-col items-center justify-center rounded-full px-5 py-1.5 transition-all active:scale-90 duration-200 ${currentView === 'library' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:text-primary'}`}
+          >
+            <span className="material-symbols-outlined" style={currentView === 'library' ? { fontVariationSettings: "'FILL' 1" } : {}}>book_4</span>
+            <span className="font-label-sm text-label-sm mt-0.5">Thư viện</span>
+          </button>
+        </div>
+      </div>
     </>
   );
 }
