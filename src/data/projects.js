@@ -107,7 +107,7 @@ export const projects = [
     id: 'bach-tuoc-mochi',
     title: 'Bạch Tuộc Mochi',
     icon: 'emoji_nature',
-    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80',
+    image: 'https://i.pinimg.com/originals/f7/79/7f/f7797f16b09533e6ce5f2d038fe1f1cb.jpg',
     description: 'Bạch tuộc mochi siêu cute, dáng tròn mập đáng yêu, thích hợp làm móc khóa hoặc đồ trang trí. Nguồn: @呐呐的毛线日常 | Dịch: Rổ chart móc len.',
     data: [
       { id: 'btm_1', part: 'Vỏ bạch tuộc', row: 'R1', formula: '6X' },
