@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-export const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://kqmvhtuhneklsgwfaeds.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_pfY2j_oI_crA3IUzTjGGZA_koB9SnZP';
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Tạo device_id duy nhất cho mỗi trình duyệt (thay cho user auth)
 export function getDeviceId() {

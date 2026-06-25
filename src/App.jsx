@@ -552,6 +552,17 @@ function App() {
         {currentView === 'library' && renderLibraryView()}
       </main>
 
+      {/* Nút FAB thêm mẫu mới cố định ở góc dưới bên phải */}
+      {currentView === 'projects' && (
+        <button
+          onClick={() => { setEditingProject(null); setShowAddModal(true); }}
+          className="fixed bottom-24 right-6 z-40 w-14 h-14 rounded-full bg-primary text-on-primary shadow-lg flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-150 cursor-pointer"
+          title="Thêm mẫu mới"
+        >
+          <span className="material-symbols-outlined text-[28px]">add</span>
+        </button>
+      )}
+
       {/* Bottom Navigation Bar */}
       <div className="fixed bottom-0 left-0 w-full z-50 bg-surface-container-lowest shadow-[0_-4px_12px_rgba(153,188,133,0.1)] rounded-t-xl px-4 pt-2 pb-safe">
         <div className="flex justify-around items-center w-full">
